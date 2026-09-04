@@ -20,14 +20,41 @@ WAKU_COLORS = {
     '8': ('#FF69B4', '#000000'),
 }
 
+# ◎○は円形の記号でフォントのem目一杯を使うため小さめのfont-sizeで、
+# ▲△は三角形の記号でem内での見た目の面積が小さいため大きめのfont-sizeで
+# 表示することで、見た目の大きさを揃える
+MARK_FONT_SIZES = {
+    '◎': '0.95em',
+    '○': '1.65em',
+    '▲': '1.55em',
+    '△': '1.55em',
+}
 
-def waku_badge(wakuban):
+# grade_code(jvd_ra)に対応する格付け表記
+GRADE_SUFFIX = {
+    'A': 'GⅠ', 'B': 'GⅡ', 'C': 'GⅢ',
+    'F': 'J.GⅠ', 'G': 'J.GⅡ', 'H': 'J.GⅢ',
+    'L': 'L',
+}
+
+
+def number_badge(number, wakuban):
     bg, fg = WAKU_COLORS.get(str(wakuban), ('#CCCCCC', '#000000'))
     border = 'border: 1px solid #888;' if str(wakuban) == '1' else ''
     return (
-        f'<span style="display:inline-block; width:1.8em; height:1.8em; line-height:1.8em; '
-        f'text-align:center; border-radius:4px; background-color:{bg}; color:{fg}; '
-        f'{border} font-weight:bold;">{wakuban}</span>'
+        f'<span style="display:inline-flex; align-items:center; justify-content:center; '
+        f'width:1.8em; height:1.8em; border-radius:4px; background-color:{bg}; color:{fg}; '
+        f'{border} font-weight:bold;">{number}</span>'
+    )
+
+
+def mark_badge(mark):
+    if not mark:
+        return ''
+    font_size = MARK_FONT_SIZES.get(mark, '1.3em')
+    return (
+        f'<span style="display:inline-flex; align-items:center; justify-content:center; '
+        f'width:1.6em; height:1.6em; font-size:{font_size}; line-height:1;">{mark}</span>'
     )
 
 
@@ -78,16 +105,29 @@ df_race = df_race.sort_values('umaban_int')
 df_race['mark'] = df_race['mark'].fillna('')
 df_race['bamei'] = df_race['bamei'].str.strip()
 
-st.subheader(f'{selected_date} {selected_track} {int(selected_race)}R')
+# レース名(特別・重賞のみ): 列が無い場合(未反映のCSV)は従来通り「XXR」のみ表示
+race_title = f'{selected_track}{int(selected_race)}R'
+if 'kyosomei_ryakusho_10' in df_race.columns:
+    race_name = str(df_race['kyosomei_ryakusho_10'].iloc[0] or '').strip()
+    if race_name and race_name.lower() != 'nan':
+        grade_code = str(df_race['grade_code'].iloc[0] or '').strip() if 'grade_code' in df_race.columns else ''
+        race_title += race_name + GRADE_SUFFIX.get(grade_code, '')
+st.markdown(f'<div style="font-size:1.1rem; font-weight:600; margin-bottom:0.4em;">{race_title}</div>',
+            unsafe_allow_html=True)
+
+has_index_score = 'index_score' in df_race.columns
 
 rows_html = ''
 for _, row in df_race.iterrows():
+    bamei_disp = row['bamei']
+    if has_index_score and pd.notna(row['index_score']):
+        bamei_disp += f' {int(float(row["index_score"]))}'
     rows_html += (
         '<tr>'
-        f'<td style="text-align:center; padding:4px;">{waku_badge(row["wakuban_int"])}</td>'
-        f'<td style="text-align:center; padding:4px;">{row["umaban_int"]}</td>'
-        f'<td style="text-align:center; padding:4px; font-size:1.2em;">{row["mark"]}</td>'
-        f'<td style="padding:4px;">{row["bamei"]}</td>'
+        f'<td style="text-align:center; padding:4px;">{number_badge(row["wakuban_int"], row["wakuban_int"])}</td>'
+        f'<td style="text-align:center; padding:4px;">{number_badge(row["umaban_int"], row["wakuban_int"])}</td>'
+        f'<td style="text-align:center; padding:4px;">{mark_badge(row["mark"])}</td>'
+        f'<td style="padding:4px;">{bamei_disp}</td>'
         '</tr>'
     )
 
