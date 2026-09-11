@@ -150,6 +150,16 @@ if 'ai_rank' in df_race.columns and pd.notna(df_race['ai_rank'].iloc[0]):
     )
     st.markdown(f'<div style="margin-bottom:0.4em;">{rank_html}</div>', unsafe_allow_html=True)
 
+# 参考情報: Cランク限定「オッズ差による◎ダウングレード」ルール(2026-09-11〜)。
+# 単勝オッズで◯の方が明確に人気(オッズ差>1.0)な場合に◎◯を入れ替えて表示している。
+# CSVはdtype=strで読むため、pandasが書き出す真偽値はTrue/Falseの文字列になる点に注意
+# (過去にai_agreeで同様の落とし穴があり== 1比較のバグを出した経緯がある)
+if 'axis_taikou_swapped' in df_race.columns and (df_race['axis_taikou_swapped'] == 'True').any():
+    st.markdown(
+        '<div style="font-size:0.8rem; color:#bf8700; margin-bottom:0.4em;">'
+        '⚠️ オッズ差ルールにより◎◯を入れ替え表示(単勝オッズで◯の方が明確に人気だったため)</div>',
+        unsafe_allow_html=True)
+
 has_index_score = 'index_score' in df_race.columns
 
 rows_html = ''
