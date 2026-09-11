@@ -182,3 +182,42 @@ table_html = f"""
 </table>
 """
 st.markdown(table_html, unsafe_allow_html=True)
+
+# ===== 資金配分レコメンド(参考表示、2026-09-09〜): S+/S/A/Bランクの馬連・三連複について、
+# 相手馬の単勝オッズ逆比例で1万円を配分した場合の推奨金額(generate_predictions.pyで算出)。
+# 検証(simulate_stake_allocation.py)で均等配分より安定して優れていたオッズ逆比例配分を採用。
+# あくまで参考情報であり、実際の購入判断・金額はユーザー自身の判断に委ねる。
+try:
+    stake_df = pd.read_csv('stake_recommendations.csv', dtype=str)
+except FileNotFoundError:
+    stake_df = None
+
+if stake_df is not None and len(df_race) > 0:
+    key_cols_stake = ['kaisai_nen', 'kaisai_tsukihi', 'keibajo_code', 'kaisai_kai', 'kaisai_nichime', 'race_bango']
+    race_key_vals = df_race.iloc[0][key_cols_stake]
+    mask = pd.Series(True, index=stake_df.index)
+    for col in key_cols_stake:
+        if col in stake_df.columns:
+            mask &= (stake_df[col] == race_key_vals[col])
+        else:
+            mask &= False
+    stake_race = stake_df[mask]
+    if len(stake_race) > 0:
+        st.markdown(
+            '<div style="font-size:0.85rem; font-weight:600; margin-top:0.8em;">推奨資金配分(参考、1万円あたり)</div>',
+            unsafe_allow_html=True)
+        for bet_type in ['馬連', '三連複']:
+            sub = stake_race[stake_race['bet_type'] == bet_type].copy()
+            if len(sub) == 0:
+                continue
+            sub['suggested_amount'] = sub['suggested_amount'].astype(float).astype(int)
+            sub = sub.sort_values('suggested_amount', ascending=False)
+            rows_stake = ''.join(
+                f'<tr><td style="padding:2px 8px;">{r["combo"]}</td>'
+                f'<td style="padding:2px 8px; text-align:right;">{r["suggested_amount"]:,}円</td></tr>'
+                for _, r in sub.iterrows()
+            )
+            st.markdown(
+                f'<div style="font-size:0.78rem; color:#888; margin-top:0.4em;">{bet_type}</div>'
+                f'<table style="font-size:0.8rem; border-collapse:collapse;"><tbody>{rows_stake}</tbody></table>',
+                unsafe_allow_html=True)
