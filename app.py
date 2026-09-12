@@ -161,12 +161,21 @@ if 'axis_taikou_swapped' in df_race.columns and (df_race['axis_taikou_swapped'] 
         unsafe_allow_html=True)
 
 has_index_score = 'index_score' in df_race.columns
+has_dm_rank = 'dm_rank' in df_race.columns
+has_tm_rank = 'tm_rank' in df_race.columns
 
 rows_html = ''
 for _, row in df_race.iterrows():
     bamei_disp = row['bamei']
     if has_index_score and pd.notna(row['index_score']):
         bamei_disp += f' {int(float(row["index_score"]))}'
+    # DM(JV-Data タイム型データマイニング予想)・TM(対戦型データマイニング予想)の参考表示。
+    # ◎○▲△の決定には一切使わない。各馬がそれぞれの上位3位以内であれば順位を追記、
+    # 圏外・データなしの馬には何も表示しない
+    if has_tm_rank and pd.notna(row['tm_rank']):
+        bamei_disp += f' TM{int(float(row["tm_rank"]))}位'
+    if has_dm_rank and pd.notna(row['dm_rank']):
+        bamei_disp += f' DM{int(float(row["dm_rank"]))}位'
     rows_html += (
         '<tr>'
         f'<td style="text-align:center; padding:4px;">{number_badge(row["wakuban_int"], row["wakuban_int"])}</td>'
