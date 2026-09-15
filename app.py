@@ -41,12 +41,12 @@ GRADE_SUFFIX = {
 # レース単位の参考ランク(◎○▲△の決定には使わない)。色は暖色=積極、寒色=中立、
 # グレー/警告色=見送り・要注意という直感に沿わせている
 RANK_INFO = {
-    'S+': ('本命型', '#B8860B', '◎が単勝2.5倍以下。的中率は高いが配当は伸びにくいため、'
+    'S+': ('本命戦', '#B8860B', '◎が単勝2.5倍以下。的中率は高いが配当は伸びにくいため、'
                                 '点数を絞る・ワイド中心などの買い方も検討'),
-    'S': ('黄金ゾーン', '#1a7f37', '検証上、通常の三連複流しで最も回収率が高かった条件'),
-    'A': ('妙味', '#0969da', '一見僅差だが、検証上むしろ好成績だった条件'),
-    'B': ('標準', '#57606a', '平均的な条件(AIとオッズが食い違うケースを含む)'),
-    'C': ('混戦・見送り推奨', '#cf222e', '検証上、最も成績が悪かった条件'),
+    'S': ('狙い目', '#1a7f37', '検証上、通常の三連複流しで最も回収率が高かった条件'),
+    'A': ('妙味あり', '#0969da', '一見僅差だが、検証上むしろ好成績だった条件'),
+    'B': ('標準(波乱もアリ?)', '#57606a', '平均的な条件(AIとオッズが食い違うケースを含む)'),
+    'C': ('混戦(見送りも?)', '#cf222e', '検証上、最も成績が悪かった条件'),
 }
 
 
@@ -160,6 +160,16 @@ if 'axis_taikou_swapped' in df_race.columns and (df_race['axis_taikou_swapped'] 
         '⚠️ オッズ差ルールにより◎◯を入れ替え表示(単勝オッズで◯の方が明確に人気だったため)</div>',
         unsafe_allow_html=True)
 
+# ☆マーク(参考機能、2026-09-15追加): index_scoreが同レース内で上位5位以内 かつ
+# 人気下位1/3(出走頭数相対) かつ 追込脚質の馬がいるレースで目立たせて表示する。
+# ◎○▲△やTM/DM表示とは完全に独立した参考情報で、回収率はまだ検証中の段階
+has_star_mark = 'star_mark' in df_race.columns
+if has_star_mark and (df_race['star_mark'] == 'True').any():
+    st.markdown(
+        '<div style="font-size:1.1rem; font-weight:600; color:#e6b800; margin-bottom:0.2em;">'
+        '☆穴馬警戒</div>',
+        unsafe_allow_html=True)
+
 has_index_score = 'index_score' in df_race.columns
 has_dm_rank = 'dm_rank' in df_race.columns
 has_tm_rank = 'tm_rank' in df_race.columns
@@ -167,21 +177,27 @@ has_tm_rank = 'tm_rank' in df_race.columns
 rows_html = ''
 for _, row in df_race.iterrows():
     bamei_disp = row['bamei']
+    if has_star_mark and row['star_mark'] == 'True':
+        bamei_disp = '<span style="color:#e6b800;">☆</span>' + bamei_disp
+
+    index_disp = ''
     if has_index_score and pd.notna(row['index_score']):
-        bamei_disp += f' {int(float(row["index_score"]))}'
+        index_disp += f'{int(float(row["index_score"]))}'
     # DM(JV-Data タイム型データマイニング予想)・TM(対戦型データマイニング予想)の参考表示。
     # ◎○▲△の決定には一切使わない。各馬がそれぞれの上位3位以内であれば順位を追記、
     # 圏外・データなしの馬には何も表示しない
     if has_tm_rank and pd.notna(row['tm_rank']):
-        bamei_disp += f' TM{int(float(row["tm_rank"]))}位'
+        index_disp += f' TM{int(float(row["tm_rank"]))}位'
     if has_dm_rank and pd.notna(row['dm_rank']):
-        bamei_disp += f' DM{int(float(row["dm_rank"]))}位'
+        index_disp += f' DM{int(float(row["dm_rank"]))}位'
+
     rows_html += (
         '<tr>'
         f'<td style="text-align:center; padding:4px;">{number_badge(row["wakuban_int"], row["wakuban_int"])}</td>'
         f'<td style="text-align:center; padding:4px;">{number_badge(row["umaban_int"], row["wakuban_int"])}</td>'
         f'<td style="text-align:center; padding:4px;">{mark_badge(row["mark"])}</td>'
         f'<td style="padding:4px;">{bamei_disp}</td>'
+        f'<td style="padding:4px;">{index_disp}</td>'
         '</tr>'
     )
 
@@ -193,6 +209,7 @@ table_html = f"""
       <th style="text-align:center; padding:4px;">馬番</th>
       <th style="text-align:center; padding:4px;">印</th>
       <th style="text-align:left; padding:4px;">馬名</th>
+      <th style="text-align:left; padding:4px;">指数</th>
     </tr>
   </thead>
   <tbody>
@@ -201,42 +218,3 @@ table_html = f"""
 </table>
 """
 st.markdown(table_html, unsafe_allow_html=True)
-
-# ===== 資金配分レコメンド(参考表示、2026-09-09〜): S+/S/A/Bランクの馬連・三連複について、
-# 相手馬の単勝オッズ逆比例で1万円を配分した場合の推奨金額(generate_predictions.pyで算出)。
-# 検証(simulate_stake_allocation.py)で均等配分より安定して優れていたオッズ逆比例配分を採用。
-# あくまで参考情報であり、実際の購入判断・金額はユーザー自身の判断に委ねる。
-try:
-    stake_df = pd.read_csv('stake_recommendations.csv', dtype=str)
-except FileNotFoundError:
-    stake_df = None
-
-if stake_df is not None and len(df_race) > 0:
-    key_cols_stake = ['kaisai_nen', 'kaisai_tsukihi', 'keibajo_code', 'kaisai_kai', 'kaisai_nichime', 'race_bango']
-    race_key_vals = df_race.iloc[0][key_cols_stake]
-    mask = pd.Series(True, index=stake_df.index)
-    for col in key_cols_stake:
-        if col in stake_df.columns:
-            mask &= (stake_df[col] == race_key_vals[col])
-        else:
-            mask &= False
-    stake_race = stake_df[mask]
-    if len(stake_race) > 0:
-        st.markdown(
-            '<div style="font-size:0.85rem; font-weight:600; margin-top:0.8em;">推奨資金配分(参考、1万円あたり)</div>',
-            unsafe_allow_html=True)
-        for bet_type in ['馬連', '三連複']:
-            sub = stake_race[stake_race['bet_type'] == bet_type].copy()
-            if len(sub) == 0:
-                continue
-            sub['suggested_amount'] = sub['suggested_amount'].astype(float).astype(int)
-            sub = sub.sort_values('suggested_amount', ascending=False)
-            rows_stake = ''.join(
-                f'<tr><td style="padding:2px 8px;">{r["combo"]}</td>'
-                f'<td style="padding:2px 8px; text-align:right;">{r["suggested_amount"]:,}円</td></tr>'
-                for _, r in sub.iterrows()
-            )
-            st.markdown(
-                f'<div style="font-size:0.78rem; color:#888; margin-top:0.4em;">{bet_type}</div>'
-                f'<table style="font-size:0.8rem; border-collapse:collapse;"><tbody>{rows_stake}</tbody></table>',
-                unsafe_allow_html=True)
