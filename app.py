@@ -173,6 +173,7 @@ if has_star_mark and (df_race['star_mark'] == 'True').any():
 has_index_score = 'index_score' in df_race.columns
 has_dm_rank = 'dm_rank' in df_race.columns
 has_tm_rank = 'tm_rank' in df_race.columns
+has_prev_margin = 'prev_margin_close' in df_race.columns
 
 rows_html = ''
 for _, row in df_race.iterrows():
@@ -190,6 +191,11 @@ for _, row in df_race.iterrows():
         index_disp += f' TM{int(float(row["tm_rank"]))}位'
     if has_dm_rank and pd.notna(row['dm_rank']):
         index_disp += f' DM{int(float(row["dm_rank"]))}位'
+    # 「接戦」(参考表示、2026-09-18追加): 前走が「着順下位1/3 かつ 1着との着差1.5秒以内」の馬。
+    # 「着順ほどは負けていなかった」という事実の注記で、◎○▲△の決定には一切使わない。
+    # 該当率は約9.4%(16頭立てで約1.5頭)。CSVから読むとbool型が文字列になるため両方を許容する
+    if has_prev_margin and str(row['prev_margin_close']) == 'True':
+        index_disp += ' 接戦'
 
     rows_html += (
         '<tr>'
