@@ -77,7 +77,8 @@ def check_password():
     st.title('競馬予測 ログイン')
     password = st.text_input('パスワード', type='password')
     if st.button('ログイン'):
-        if password == st.secrets.get('APP_PASSWORD', ''):
+        expected = st.secrets.get('APP_PASSWORD', '')
+        if expected and password == expected:
             st.session_state['authenticated'] = True
             st.rerun()
         else:
